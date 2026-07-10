@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nakory Gift - Panel de clientes</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', sans-serif;
+    background: #f6f3fb;
+    color: #2c2c2c;
+  }
+  header {
+    background: linear-gradient(135deg, #f6c9d8 0%, #d9d3ee 50%, #bfe9de 100%);
+    padding: 18px 24px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  header .logo {
+    width: 46px; height: 46px; border-radius: 50%; background: #fff; border: 2px solid #222;
+    display: flex; align-items: center; justify-content: center; font-weight: bold;
+  }
+  header .logo span:nth-child(1) { color: #ec1f6e; }
+  header .logo span:nth-child(2) { color: #16a3a8; }
+  header h1 { font-size: 18px; margin: 0; }
+  header p { font-size: 12px; margin: 2px 0 0; color: #55504f; }
+  .layout {
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+  .card {
+    background: #fff;
+    border-radius: 14px;
+    padding: 18px 20px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+  }
+  .card h2 { font-size: 15px; margin: 0 0 14px; }
+  label { display: block; font-size: 12px; color: #6b6560; margin: 10px 0 4px; }
+  input {
+    width: 100%; padding: 9px 10px; border-radius: 8px; border: 1px solid #ddd8ea;
+    font-size: 14px; background: #faf9fc;
+  }
+  input:focus { outline: none; border-color: #b79ee0; }
+  .btn-add {
+    width: 100%; margin-top: 16px; padding: 11px; border: none; border-radius: 10px;
+    background: #6e56a8; color: #fff; font-weight: 600; font-size: 14px; cursor: pointer;
+  }
+  .btn-add:disabled { background: #b6acce; cursor: default; }
+  .btn-add:hover:not(:disabled) { background: #5c479a; }
+  .result-box {
+    display: none; margin-top: 14px; background: #eafaf1; border-radius: 10px; padding: 12px;
+  }
+  .result-box.show { display: block; }
+  .result-box .titulo { font-size: 12px; color: #0f6e56; font-weight: 600; margin-bottom: 8px; }
+  .result-box .sub { font-size: 11px; color: #55504f; margin-bottom: 10px; }
+  .wsp-btn {
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    background: #25D366; color: #fff; text-decoration: none; padding: 10px; border-radius: 8px;
+    font-size: 13px; font-weight: 600; margin-bottom: 8px;
+  }
+  .pdf-link {
+    display: block; text-align: center; font-size: 12px; color: #6e56a8;
+  }
+  .error-box {
+    display: none; margin-top: 14px; background: #fdeaea; color: #a32d2d;
+    border-radius: 10px; padding: 12px; font-size: 12px;
+  }
+  .error-box.show { display: block; }
+  .config-note {
+    font-size: 11px; color: #b0aab7; margin-top: 18px; text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo"><span>K</span><span>|</span></div>
+  <div>
+    <h1>Nakory Gift &mdash; Registrar compra</h1>
+    <p>Se guarda en el Sheet, genera PDF y arma el link de WhatsApp</p>
+  </div>
+</header>
+
+<div class="layout">
+  <div class="card">
+    <h2>+ Agregar clienta / registrar compra</h2>
+    <label>Nombre completo</label>
+    <input type="text" id="f-nombre" placeholder="Ej. María Pérez">
+    <label>Dirección</label>
+    <input type="text" id="f-direccion" placeholder="Sector, calle, referencia">
+    <label>Número de celular</label>
+    <input type="text" id="f-celular" placeholder="09XXXXXXXX">
+    <label>Detalle del producto</label>
+    <input type="text" id="f-detalle" placeholder="Ej. Ramo de rosas + peluche">
+    <label>Valor de la compra ($)</label>
+    <input type="number" id="f-valor" placeholder="0.00">
+    <label>Foto de la transferencia (opcional)</label>
+    <input type="file" id="f-foto" accept="image/*">
+
+    <button class="btn-add" id="btn-agregar" onclick="agregarCliente()">Agregar clienta y generar PDF</button>
+
+    <div class="result-box" id="result-box">
+      <div class="titulo" id="result-titulo">Clienta agregada, PDF guardado en Drive</div>
+      <div class="sub" id="result-sub"></div>
+      <a id="wsp-link" class="wsp-btn" href="#" target="_blank">Enviar tarjeta por WhatsApp</a>
+      <a id="pdf-link" class="pdf-link" href="#" target="_blank">Ver PDF del recibo</a>
+    </div>
+
+    <div class="error-box" id="error-box"></div>
+  </div>
+
+
+
+<script>
+// URL del Apps Script publicado
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwxdSZdzIlFUDrEsNI7v1jc84xQgvm0CWDmw_eboZ1MKjKNbszz65OooiKO1pu_M5ceGQ/exec';
+
+// URL de la tarjeta del cliente en GitHub Pages
+const TARJETA_URL = 'https://arrowcompany.github.io/nakory-gift/tarjeta_cliente.html';
+
+function leerArchivoComoBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(',')[1]);
+    reader.onerror = () => reject(new Error('No se pudo leer la imagen'));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function agregarCliente() {
+  const nombre = document.getElementById('f-nombre').value.trim();
+  const direccion = document.getElementById('f-direccion').value.trim();
+  const celular = document.getElementById('f-celular').value.trim();
+  const detalle = document.getElementById('f-detalle').value.trim();
+  const valor = document.getElementById('f-valor').value.trim();
+  const fotoInput = document.getElementById('f-foto');
+  const fotoFile = fotoInput.files[0];
+
+  const errorBox = document.getElementById('error-box');
+  const resultBox = document.getElementById('result-box');
+  errorBox.classList.remove('show');
+  resultBox.classList.remove('show');
+
+  if (!nombre || !celular || !detalle || !valor) {
+    errorBox.textContent = 'Completa nombre, celular, detalle y valor.';
+    errorBox.classList.add('show');
+    return;
+  }
+
+  const btn = document.getElementById('btn-agregar');
+  btn.disabled = true;
+  btn.textContent = 'Guardando...';
+
+  try {
+    let fotoBase64 = null;
+    let fotoMimeType = null;
+    if (fotoFile) {
+      btn.textContent = 'Subiendo foto...';
+      fotoBase64 = await leerArchivoComoBase64(fotoFile);
+      fotoMimeType = fotoFile.type;
+    }
+
+    btn.textContent = 'Guardando...';
+    const resp = await fetch(SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({
+        action: 'agregarCliente',
+        nombre, direccion, celular, detalle, valor,
+        fotoBase64, fotoMimeType
+      })
+    });
+    const data = await resp.json();
+
+    if (!data.success) {
+      errorBox.textContent = 'Error: ' + (data.error || 'No se pudo guardar');
+      errorBox.classList.add('show');
+      return;
+    }
+
+    const numeroLimpio = celular.replace(/\D/g, '');
+    const numeroConCodigo = numeroLimpio.startsWith('593') ? numeroLimpio : '593' + numeroLimpio.replace(/^0/, '');
+    const linkTarjeta = TARJETA_URL + '?id=' + data.id;
+
+    let mensaje = 'Hola ' + nombre + ', gracias por tu compra (' + detalle + ', $' + valor + '). ';
+    mensaje += 'Llevas ' + data.totalSellos + ' de 5 sellos en tu tarjeta VIP. ';
+    if (data.metaAlcanzada) {
+      mensaje += 'Completaste tu tarjeta, tienes 25% de descuento en tu proxima compra mayor a $25. ';
+    }
+    mensaje += 'Míra tu tarjeta aquí: ' + linkTarjeta;
+
+    document.getElementById('wsp-link').href = 'https://wa.me/' + numeroConCodigo + '?text=' + encodeURIComponent(mensaje);
+    document.getElementById('pdf-link').href = data.pdfUrl;
+    document.getElementById('result-sub').textContent = 'ID clienta: ' + data.id + ' · Sellos: ' + data.totalSellos + ' de 5';
+    resultBox.classList.add('show');
+
+    document.getElementById('f-nombre').value = '';
+    document.getElementById('f-direccion').value = '';
+    document.getElementById('f-celular').value = '';
+    document.getElementById('f-detalle').value = '';
+    document.getElementById('f-valor').value = '';
+    document.getElementById('f-foto').value = '';
+
+  } catch (err) {
+    errorBox.textContent = 'No se pudo conectar con el servidor. Revisa la URL del Apps Script.';
+    errorBox.classList.add('show');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Agregar clienta y generar PDF';
+  }
+}
+</script>
+
+</body>
+</html>
