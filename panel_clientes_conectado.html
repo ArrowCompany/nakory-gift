@@ -218,6 +218,21 @@
     </div>
   </div>
 
+  <!-- VISTA DETALLE CLIENTE -->
+  <div class="view" id="view-detalle">
+    <div class="card" style="max-width: 460px; margin: 0 auto;">
+      <h2 id="det-nombre" style="margin-bottom:2px;">-</h2>
+      <p class="client-sub" id="det-sub" style="margin:0 0 14px;">-</p>
+      <div class="dots" id="det-dots" style="margin-bottom:14px;"></div>
+      <div id="det-banner" style="display:none; background:#fdeeda; color:#854f0b; border-radius:10px; padding:10px 12px; font-size:12px; font-weight:600; margin-bottom:14px;">
+        Completó su tarjeta — 25% off en su próxima compra mayor a $25
+      </div>
+      <a id="det-wsp" class="wsp-btn" href="#" target="_blank">Compartir tarjeta por WhatsApp</a>
+      <h3 style="font-size:13px; margin:18px 0 8px;">Historial de compras</h3>
+      <div id="det-historial"></div>
+    </div>
+  </div>
+
   <!-- VISTA AGREGAR -->
   <div class="view" id="view-agregar">
     <div class="card" style="max-width: 380px; margin: 0 auto;">
@@ -276,7 +291,7 @@ function mostrarVista(nombre) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById('view-' + nombre).classList.add('active');
   document.getElementById('back-btn').style.display = (nombre === 'lista') ? 'none' : 'flex';
-  document.getElementById('add-btn').style.display = (nombre === 'agregar') ? 'none' : 'flex';
+  document.getElementById('add-btn').style.display = (nombre === 'agregar' || nombre === 'detalle') ? 'none' : 'flex';
   if (nombre === 'agenda') cargarAgenda();
   if (nombre === 'lista') cargarClientes();
 }
@@ -312,7 +327,7 @@ function renderTabla(lista) {
       dots += '<div class="dot ' + (i < sellos ? 'filled' : '') + '"></div>';
     }
     const listo = sellos >= META_SELLOS;
-    html += '<tr>' +
+    html += '<tr class="client-row" data-id="' + c.id + '" style="cursor:pointer;">' +
       '<td><div class="client-name">' + c.nombre + '</div><div class="client-sub">' + c.celular + '</div></td>' +
       '<td>' + c.ultimaCompra + '</td>' +
       '<td><div class="dots">' + dots + '</div></td>' +
@@ -320,6 +335,9 @@ function renderTabla(lista) {
       '</tr>';
   });
   table.innerHTML = html;
+  document.querySelectorAll('.client-row').forEach(row => {
+    row.addEventListener('click', () => cargarDetalleCliente(row.getAttribute('data-id')));
+  });
 }
 
 document.getElementById('search-input').addEventListener('input', function(e) {
@@ -517,6 +535,63 @@ async function agregarCliente() {
   } finally {
     btn.disabled = false;
     btn.textContent = 'Agregar clienta y generar PDF';
+  }
+}
+
+// ---------- DETALLE DE CLIENTE ----------
+async function cargarDetalleCliente(id) {
+  mostrarVista('detalle');
+  document.getElementById('det-nombre').textContent = 'Cargando...';
+  document.getElementById('det-sub').textContent = '';
+  document.getElementById('det-dots').innerHTML = '';
+  document.getElementById('det-historial').innerHTML = '';
+  document.getElementById('det-banner').style.display = 'none';
+
+  try {
+    const resp = await fetch(SCRIPT_URL + '?action=tarjeta&id=' + encodeURIComponent(id));
+    const data = await resp.json();
+    if (!data.success) {
+      document.getElementById('det-nombre').textContent = 'No se encontró la clienta';
+      return;
+    }
+
+    const sellos = Number(data.totalSellos) || 0;
+    document.getElementById('det-nombre').textContent = data.nombre;
+    document.getElementById('det-sub').textContent = (data.celular || '') + (data.direccion ? ' · ' + data.direccion : '');
+
+    let dots = '';
+    for (let i = 0; i < META_SELLOS; i++) {
+      dots += '<div class="dot ' + (i < sellos ? 'filled' : '') + '"></div>';
+    }
+    document.getElementById('det-dots').innerHTML = dots;
+
+    const completo = sellos >= META_SELLOS;
+    document.getElementById('det-banner').style.display = completo ? 'block' : 'none';
+
+    const numeroLimpio = String(data.celular || '').replace(/\D/g, '');
+    const numeroConCodigo = numeroLimpio.startsWith('593') ? numeroLimpio : '593' + numeroLimpio.replace(/^0/, '');
+    const linkTarjeta = TARJETA_URL + '?id=' + data.id;
+    let mensaje = 'Hola ' + data.nombre + ', aquí está tu tarjeta VIP. Llevas ' + sellos + ' de 5 sellos. ';
+    if (completo) mensaje += 'Ya tienes 25% de descuento en tu próxima compra mayor a $25. ';
+    mensaje += 'Míra tu tarjeta aquí: ' + linkTarjeta;
+    document.getElementById('det-wsp').href = 'https://wa.me/' + numeroConCodigo + '?text=' + encodeURIComponent(mensaje);
+
+    const historialEl = document.getElementById('det-historial');
+    if (!data.historial || !data.historial.length) {
+      historialEl.innerHTML = '<p style="font-size:13px; color:#918a9e;">Aún no hay compras registradas.</p>';
+    } else {
+      historialEl.innerHTML = '';
+      data.historial.slice().reverse().forEach(c => {
+        const row = document.createElement('div');
+        row.className = 'compra-row';
+        row.innerHTML = '<div><div style="font-weight:600;">' + c.detalle + '</div><div style="font-size:11px; color:#918a9e;">' + c.fecha + '</div></div>' +
+          '<div style="text-align:right;"><div style="font-weight:700; color:#6e56a8;">$' + c.valor + '</div>' +
+          (c.pdfUrl ? '<a href="' + c.pdfUrl + '" target="_blank" style="font-size:11px; color:#6e56a8;">Ver PDF</a>' : '') + '</div>';
+        historialEl.appendChild(row);
+      });
+    }
+  } catch (err) {
+    document.getElementById('det-nombre').textContent = 'No se pudo cargar la clienta';
   }
 }
 
