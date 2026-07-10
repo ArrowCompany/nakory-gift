@@ -171,6 +171,7 @@
     <button class="agenda-btn" onclick="mostrarVista('agenda')">Agenda</button>
     <div class="icon-row">
       <button class="icon-btn" id="bell-btn" title="Alertas">🔔<span class="dot" id="bell-dot"></span></button>
+      <button class="icon-btn" id="refresh-btn" title="Actualizar">🔄</button>
       <button class="icon-btn" id="gear-btn" title="Configuración">⚙️</button>
     </div>
   </div>
@@ -178,7 +179,7 @@
 
 <div class="layout">
 
-  <button class="fab-back" id="back-btn" onclick="mostrarVista('lista')">←</button>
+  <button class="fab-back" id="back-btn" onclick="goBack()">←</button>
 
   <!-- VISTA LISTA -->
   <div class="view active" id="view-lista">
@@ -227,6 +228,7 @@
         Completó su tarjeta — 25% off en su próxima compra mayor a $25
       </div>
       <a id="det-wsp" class="wsp-btn" href="#" target="_blank">Compartir tarjeta por WhatsApp</a>
+      <button class="btn-add" id="btn-nueva-compra" style="margin-top:0;" onclick="abrirNuevaCompra()">+ Nueva compra</button>
       <h3 style="font-size:13px; margin:18px 0 8px;">Historial de compras</h3>
       <div id="det-historial"></div>
     </div>
@@ -235,7 +237,7 @@
   <!-- VISTA AGREGAR -->
   <div class="view" id="view-agregar">
     <div class="card" style="max-width: 380px; margin: 0 auto;">
-      <h2>+ Agregar clienta / registrar compra</h2>
+      <h2 id="form-title">+ Agregar clienta / registrar compra</h2>
       <label>Nombre completo</label>
       <input type="text" id="f-nombre" placeholder="Ej. María Pérez">
       <label>Dirección</label>
@@ -256,13 +258,14 @@
         <div class="sub" id="result-sub"></div>
         <a id="wsp-link" class="wsp-btn" href="#" target="_blank">Enviar tarjeta por WhatsApp</a>
         <a id="pdf-link" class="pdf-link" href="#" target="_blank">Ver PDF del recibo</a>
+        <a id="volver-tarjeta-link" class="pdf-link" href="#" style="display:none; margin-top:6px;" onclick="goBack(); return false;">← Volver a la tarjeta de la clienta</a>
       </div>
 
       <div class="error-box" id="error-box"></div>
     </div>
   </div>
 
-  <button class="fab-add" id="add-btn" title="Agregar clienta" onclick="mostrarVista('agregar')">+</button>
+  <button class="fab-add" id="add-btn" title="Agregar clienta" onclick="abrirNuevoCliente()">+</button>
 
 </div>
 
@@ -286,6 +289,9 @@ let mesActual = new Date().getMonth() + 1;
 let anioActual = new Date().getFullYear();
 const nombresMes = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
+// Clienta actualmente abierta en la vista de detalle (para "+ Nueva compra" y el botón atrás)
+let clienteDetalleActual = null;
+
 function mostrarVista(nombre) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById('view-' + nombre).classList.add('active');
@@ -293,6 +299,49 @@ function mostrarVista(nombre) {
   document.getElementById('add-btn').style.display = (nombre === 'agregar' || nombre === 'detalle') ? 'none' : 'flex';
   if (nombre === 'agenda') cargarAgenda();
   if (nombre === 'lista') cargarClientes();
+}
+
+// Botón "atrás": si venimos del formulario de compra abierto desde una clienta, regresa a esa clienta
+function goBack() {
+  const vistaActiva = document.querySelector('.view.active').id;
+  if (vistaActiva === 'view-agregar' && clienteDetalleActual) {
+    mostrarVista('detalle');
+    cargarDetalleCliente(clienteDetalleActual.id);
+  } else {
+    mostrarVista('lista');
+  }
+}
+
+// Abre el formulario en modo "nueva clienta" (vacío)
+function abrirNuevoCliente() {
+  clienteDetalleActual = null;
+  document.getElementById('form-title').textContent = '+ Agregar clienta / registrar compra';
+  document.getElementById('btn-agregar').textContent = 'Agregar clienta y generar PDF';
+  document.getElementById('f-nombre').value = '';
+  document.getElementById('f-direccion').value = '';
+  document.getElementById('f-celular').value = '';
+  document.getElementById('f-detalle').value = '';
+  document.getElementById('f-valor').value = '';
+  document.getElementById('f-foto').value = '';
+  document.getElementById('result-box').classList.remove('show');
+  document.getElementById('error-box').classList.remove('show');
+  mostrarVista('agregar');
+}
+
+// Abre el formulario en modo "nueva compra" para la clienta que se está viendo
+function abrirNuevaCompra() {
+  if (!clienteDetalleActual) return;
+  document.getElementById('form-title').textContent = '+ Nueva compra de ' + clienteDetalleActual.nombre;
+  document.getElementById('btn-agregar').textContent = 'Registrar compra';
+  document.getElementById('f-nombre').value = clienteDetalleActual.nombre || '';
+  document.getElementById('f-direccion').value = clienteDetalleActual.direccion || '';
+  document.getElementById('f-celular').value = clienteDetalleActual.celular || '';
+  document.getElementById('f-detalle').value = '';
+  document.getElementById('f-valor').value = '';
+  document.getElementById('f-foto').value = '';
+  document.getElementById('result-box').classList.remove('show');
+  document.getElementById('error-box').classList.remove('show');
+  mostrarVista('agregar');
 }
 
 // ---------- LISTA DE CLIENTES ----------
@@ -432,6 +481,38 @@ function mostrarDetalleDia(dia, compras) {
   });
 }
 
+// ---------- ACTUALIZAR ----------
+document.getElementById('refresh-btn').addEventListener('click', async function() {
+  const btn = this;
+  if (btn.disabled) return;
+  btn.disabled = true;
+  const original = btn.innerHTML.replace('<span class="dot" id="bell-dot"></span>', '');
+  btn.textContent = '⏳';
+  try {
+    const vistaActiva = document.querySelector('.view.active').id;
+    if (vistaActiva === 'view-lista') {
+      await cargarClientes();
+    } else if (vistaActiva === 'view-agenda') {
+      await cargarAgenda();
+    } else if (vistaActiva === 'view-detalle' && clienteDetalleActual) {
+      await cargarDetalleCliente(clienteDetalleActual.id);
+    } else {
+      await cargarClientes();
+    }
+    // refresca también el link de descarga de Excel por si hay datos nuevos
+    const resp = await fetch(SCRIPT_URL + '?action=exportExcel');
+    const data = await resp.json();
+    if (data.success) {
+      document.getElementById('excel-link').href = data.url;
+    }
+  } catch (err) {
+    // silencioso: si falla, simplemente no se actualiza
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '🔄';
+  }
+});
+
 // ---------- CONFIGURACION / EXCEL ----------
 document.getElementById('gear-btn').addEventListener('click', async function() {
   document.getElementById('overlay').classList.add('show');
@@ -519,6 +600,7 @@ async function agregarCliente() {
     document.getElementById('wsp-link').href = 'https://wa.me/' + numeroConCodigo + '?text=' + encodeURIComponent(mensaje);
     document.getElementById('pdf-link').href = data.pdfUrl;
     document.getElementById('result-sub').textContent = 'ID clienta: ' + data.id + ' · Sellos: ' + data.totalSellos + ' de 5';
+    document.getElementById('volver-tarjeta-link').style.display = clienteDetalleActual ? 'block' : 'none';
     resultBox.classList.add('show');
 
     document.getElementById('f-nombre').value = '';
@@ -533,7 +615,7 @@ async function agregarCliente() {
     errorBox.classList.add('show');
   } finally {
     btn.disabled = false;
-    btn.textContent = 'Agregar clienta y generar PDF';
+    btn.textContent = clienteDetalleActual ? 'Registrar compra' : 'Agregar clienta y generar PDF';
   }
 }
 
@@ -553,6 +635,8 @@ async function cargarDetalleCliente(id) {
       document.getElementById('det-nombre').textContent = 'No se encontró la clienta';
       return;
     }
+
+    clienteDetalleActual = data;
 
     const sellos = Number(data.totalSellos) || 0;
     document.getElementById('det-nombre').textContent = data.nombre;
