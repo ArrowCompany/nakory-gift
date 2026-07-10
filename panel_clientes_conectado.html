@@ -98,6 +98,8 @@
     <input type="text" id="f-detalle" placeholder="Ej. Ramo de rosas + peluche">
     <label>Valor de la compra ($)</label>
     <input type="number" id="f-valor" placeholder="0.00">
+    <label>Foto de la transferencia (opcional)</label>
+    <input type="file" id="f-foto" accept="image/*">
 
     <button class="btn-add" id="btn-agregar" onclick="agregarCliente()">Agregar clienta y generar PDF</button>
 
@@ -120,12 +122,23 @@ const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwxdSZdzIlFUDrEsNI7v
 // URL de la tarjeta del cliente en GitHub Pages
 const TARJETA_URL = 'https://arrowcompany.github.io/nakory-gift/tarjeta_cliente.html';
 
+function leerArchivoComoBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(',')[1]);
+    reader.onerror = () => reject(new Error('No se pudo leer la imagen'));
+    reader.readAsDataURL(file);
+  });
+}
+
 async function agregarCliente() {
   const nombre = document.getElementById('f-nombre').value.trim();
   const direccion = document.getElementById('f-direccion').value.trim();
   const celular = document.getElementById('f-celular').value.trim();
   const detalle = document.getElementById('f-detalle').value.trim();
   const valor = document.getElementById('f-valor').value.trim();
+  const fotoInput = document.getElementById('f-foto');
+  const fotoFile = fotoInput.files[0];
 
   const errorBox = document.getElementById('error-box');
   const resultBox = document.getElementById('result-box');
@@ -143,12 +156,22 @@ async function agregarCliente() {
   btn.textContent = 'Guardando...';
 
   try {
+    let fotoBase64 = null;
+    let fotoMimeType = null;
+    if (fotoFile) {
+      btn.textContent = 'Subiendo foto...';
+      fotoBase64 = await leerArchivoComoBase64(fotoFile);
+      fotoMimeType = fotoFile.type;
+    }
+
+    btn.textContent = 'Guardando...';
     const resp = await fetch(SCRIPT_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain' },
       body: JSON.stringify({
         action: 'agregarCliente',
-        nombre, direccion, celular, detalle, valor
+        nombre, direccion, celular, detalle, valor,
+        fotoBase64, fotoMimeType
       })
     });
     const data = await resp.json();
@@ -180,6 +203,7 @@ async function agregarCliente() {
     document.getElementById('f-celular').value = '';
     document.getElementById('f-detalle').value = '';
     document.getElementById('f-valor').value = '';
+    document.getElementById('f-foto').value = '';
 
   } catch (err) {
     errorBox.textContent = 'No se pudo conectar con el servidor. Revisa la URL del Apps Script.';
