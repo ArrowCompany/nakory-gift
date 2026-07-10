@@ -190,7 +190,7 @@
           🔍<input type="text" id="search-input" placeholder="Buscar por nombre o celular...">
         </div>
       </div>
-      <p class="nota">Solo las compras desde $20 suman sello en la tarjeta.</p>
+      <p class="nota">Solo las compras desde $10 suman sello en la tarjeta.</p>
       <table id="client-table">
         <tr><th>Clienta</th><th>Última compra</th><th>Progreso tarjeta</th><th>Estado</th></tr>
         <tr><td colspan="4" style="text-align:center; color:#918a9e; padding:20px;">Cargando clientas...</td></tr>
@@ -251,7 +251,7 @@
         <button class="btn-add" style="margin-top:0; background:#a32d2d;" onclick="recuperarContactoActual()">↩️ Recuperar contacto</button>
       </div>
       <div id="det-banner" style="display:none; background:#fdeeda; color:#854f0b; border-radius:10px; padding:10px 12px; font-size:12px; font-weight:600; margin-bottom:14px;">
-        Completó su tarjeta — 25% off en su próxima compra mayor a $25
+        Completó su tarjeta — 20% de descuento en un producto de $20
       </div>
       <a id="det-wsp" class="wsp-btn" href="#" target="_blank">Compartir tarjeta por WhatsApp</a>
       <button class="btn-add" id="btn-nueva-compra" style="margin-top:0;" onclick="abrirNuevaCompra()">+ Nueva compra</button>
@@ -332,7 +332,7 @@
 <script>
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwxdSZdzIlFUDrEsNI7v1jc84xQgvm0CWDmw_eboZ1MKjKNbszz65OooiKO1pu_M5ceGQ/exec';
 const TARJETA_URL = 'https://arrowcompany.github.io/nakory-gift/tarjeta_cliente.html';
-const META_SELLOS = 5;
+const META_SELLOS = 10;
 
 let mesActual = new Date().getMonth() + 1;
 let anioActual = new Date().getFullYear();
@@ -630,7 +630,7 @@ function revisarCompletas(lista) {
 document.getElementById('bell-btn').addEventListener('click', function() {
   const nombres = window.completasNombres || [];
   if (nombres.length) {
-    alert(nombres.join(', ') + ' ya completó sus 5 compras. Tiene 25% de descuento disponible en su próxima compra mayor a $25.');
+    alert(nombres.join(', ') + ' ya completó sus 10 compras. Tiene 20% de descuento disponible en un producto de $20.');
   } else {
     alert('Por ahora ninguna clienta ha completado su tarjeta.');
   }
@@ -819,15 +819,15 @@ async function agregarCliente() {
     const linkTarjeta = TARJETA_URL + '?id=' + data.id;
 
     let mensaje = 'Hola ' + nombre + ', gracias por tu compra (' + detalle + ', $' + valor + '). ';
-    mensaje += 'Llevas ' + data.totalSellos + ' de 5 sellos en tu tarjeta VIP. ';
+    mensaje += 'Llevas ' + data.totalSellos + ' de 10 sellos en tu tarjeta VIP. ';
     if (data.metaAlcanzada) {
-      mensaje += 'Completaste tu tarjeta, tienes 25% de descuento en tu proxima compra mayor a $25. ';
+      mensaje += 'Completaste tu tarjeta, tienes 20% de descuento en un producto de $20 en tu próxima compra. ';
     }
     mensaje += 'Míra tu tarjeta aquí: ' + linkTarjeta;
 
     document.getElementById('wsp-link').href = 'https://wa.me/' + numeroConCodigo + '?text=' + encodeURIComponent(mensaje);
     document.getElementById('pdf-link').href = data.pdfUrl;
-    document.getElementById('result-sub').textContent = 'ID clienta: ' + data.id + ' · Sellos: ' + data.totalSellos + ' de 5';
+    document.getElementById('result-sub').textContent = 'ID clienta: ' + data.id + ' · Sellos: ' + data.totalSellos + ' de 10';
     document.getElementById('volver-tarjeta-link').style.display = clienteDetalleActual ? 'block' : 'none';
     resultBox.classList.add('show');
 
@@ -889,8 +889,8 @@ async function cargarDetalleCliente(id) {
     const numeroLimpio = String(data.celular || '').replace(/\D/g, '');
     const numeroConCodigo = numeroLimpio.startsWith('593') ? numeroLimpio : '593' + numeroLimpio.replace(/^0/, '');
     const linkTarjeta = TARJETA_URL + '?id=' + data.id;
-    let mensaje = 'Hola ' + data.nombre + ', aquí está tu tarjeta VIP. Llevas ' + sellos + ' de 5 sellos. ';
-    if (completo) mensaje += 'Ya tienes 25% de descuento en tu próxima compra mayor a $25. ';
+    let mensaje = 'Hola ' + data.nombre + ', aquí está tu tarjeta VIP. Llevas ' + sellos + ' de 10 sellos. ';
+    if (completo) mensaje += 'Ya tienes 20% de descuento en un producto de $20 en tu próxima compra. ';
     mensaje += 'Míra tu tarjeta aquí: ' + linkTarjeta;
     document.getElementById('det-wsp').href = 'https://wa.me/' + numeroConCodigo + '?text=' + encodeURIComponent(mensaje);
 
