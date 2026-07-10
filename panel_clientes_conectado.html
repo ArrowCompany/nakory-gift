@@ -198,6 +198,20 @@
     </div>
   </div>
 
+  <!-- VISTA CLIENTAS ELIMINADAS -->
+  <div class="view" id="view-eliminados">
+    <div class="card">
+      <div class="top-row">
+        <h2>Clientas eliminadas</h2>
+      </div>
+      <p class="nota">Toca una clienta para ver su tarjeta completa y recuperarla.</p>
+      <table id="deleted-table">
+        <tr><th>Clienta</th><th>Progreso tarjeta</th></tr>
+        <tr><td colspan="2" style="text-align:center; color:#918a9e; padding:20px;">Cargando...</td></tr>
+      </table>
+    </div>
+  </div>
+
   <!-- VISTA AGENDA -->
   <div class="view" id="view-agenda">
     <div class="card">
@@ -221,17 +235,21 @@
   <!-- VISTA DETALLE CLIENTE -->
   <div class="view" id="view-detalle">
     <div class="card" style="max-width: 460px; margin: 0 auto;">
-      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
+      <div id="det-header-acciones" style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
         <div>
           <h2 id="det-nombre" style="margin-bottom:2px;">-</h2>
           <p class="client-sub" id="det-sub" style="margin:0 0 14px;">-</p>
         </div>
-        <div style="display:flex; gap:6px; flex-shrink:0;">
+        <div id="det-acciones-iconos" style="display:flex; gap:6px; flex-shrink:0;">
           <button class="icon-btn" title="Editar contacto" onclick="abrirEditarContacto()">✏️</button>
           <button class="icon-btn" title="Eliminar contacto" onclick="eliminarContactoActual()">🗑️</button>
         </div>
       </div>
       <div class="dots" id="det-dots" style="margin-bottom:14px;"></div>
+      <div id="det-banner-eliminado" style="display:none; background:#fdeaea; color:#a32d2d; border-radius:10px; padding:10px 12px; font-size:12px; font-weight:600; margin-bottom:14px;">
+        <div style="margin-bottom:8px;">Esta clienta fue eliminada. Ya no aparece en la lista ni suma sellos.</div>
+        <button class="btn-add" style="margin-top:0; background:#a32d2d;" onclick="recuperarContactoActual()">↩️ Recuperar contacto</button>
+      </div>
       <div id="det-banner" style="display:none; background:#fdeeda; color:#854f0b; border-radius:10px; padding:10px 12px; font-size:12px; font-weight:600; margin-bottom:14px;">
         Completó su tarjeta — 25% off en su próxima compra mayor a $25
       </div>
@@ -304,6 +322,7 @@
     <h3>Configuración</h3>
     <p>Opciones del panel Nakory Gift</p>
     <a href="#" id="excel-link" class="opt excel" target="_blank">📊 Descargar Excel</a>
+    <button class="opt" onclick="abrirClientesEliminados()">🗑️ Clientas eliminadas</button>
     <button class="opt">🔔 Notificaciones</button>
     <button class="opt">👤 Cuenta</button>
     <button class="close-btn" onclick="document.getElementById('overlay').classList.remove('show')">Cerrar</button>
@@ -321,14 +340,17 @@ const nombresMes = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Ag
 
 // Clienta actualmente abierta en la vista de detalle (para "+ Nueva compra" y el botón atrás)
 let clienteDetalleActual = null;
+// Vista desde la que se abrió el detalle ('lista' o 'eliminados'), para que el botón atrás regrese ahí
+let origenDetalle = 'lista';
 
 function mostrarVista(nombre) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById('view-' + nombre).classList.add('active');
   document.getElementById('back-btn').style.display = (nombre === 'lista') ? 'none' : 'flex';
-  document.getElementById('add-btn').style.display = (nombre === 'agregar' || nombre === 'detalle') ? 'none' : 'flex';
+  document.getElementById('add-btn').style.display = (nombre === 'agregar' || nombre === 'detalle' || nombre === 'eliminados') ? 'none' : 'flex';
   if (nombre === 'agenda') cargarAgenda();
   if (nombre === 'lista') cargarClientes();
+  if (nombre === 'eliminados') cargarClientesEliminados();
 }
 
 // Botón "atrás": si venimos del formulario de compra abierto desde una clienta, regresa a esa clienta
@@ -337,6 +359,8 @@ function goBack() {
   if (vistaActiva === 'view-agregar' && clienteDetalleActual) {
     mostrarVista('detalle');
     cargarDetalleCliente(clienteDetalleActual.id);
+  } else if (vistaActiva === 'view-detalle') {
+    mostrarVista(origenDetalle);
   } else {
     mostrarVista('lista');
   }
@@ -481,6 +505,70 @@ async function eliminarContactoActual() {
   }
 }
 
+async function recuperarContactoActual() {
+  if (!clienteDetalleActual) return;
+  try {
+    const resp = await fetch(SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ action: 'recuperarCliente', id: clienteDetalleActual.id })
+    });
+    const data = await resp.json();
+
+    if (!data.success) {
+      alert('Error: ' + (data.error || 'No se pudo recuperar'));
+      return;
+    }
+
+    cargarDetalleCliente(clienteDetalleActual.id);
+  } catch (err) {
+    alert('No se pudo conectar con el servidor.');
+  }
+}
+
+// ---------- CLIENTAS ELIMINADAS ----------
+function abrirClientesEliminados() {
+  document.getElementById('overlay').classList.remove('show');
+  mostrarVista('eliminados');
+}
+
+async function cargarClientesEliminados() {
+  const table = document.getElementById('deleted-table');
+  try {
+    const resp = await fetch(SCRIPT_URL + '?action=listaClientesEliminados');
+    const data = await resp.json();
+    if (!data.success) {
+      table.innerHTML = '<tr><th>Clienta</th><th>Progreso tarjeta</th></tr><tr><td colspan="2" style="text-align:center; color:#a32d2d; padding:20px;">No se pudo cargar la lista.</td></tr>';
+      return;
+    }
+    if (!data.clientes.length) {
+      table.innerHTML = '<tr><th>Clienta</th><th>Progreso tarjeta</th></tr><tr><td colspan="2" style="text-align:center; color:#918a9e; padding:20px;">No hay clientas eliminadas.</td></tr>';
+      return;
+    }
+    let html = '<tr><th>Clienta</th><th>Progreso tarjeta</th></tr>';
+    data.clientes.forEach(c => {
+      const sellos = Number(c.totalSellos) || 0;
+      let dots = '';
+      for (let i = 0; i < META_SELLOS; i++) {
+        dots += '<div class="dot ' + (i < sellos ? 'filled' : '') + '"></div>';
+      }
+      html += '<tr class="client-row" data-id="' + c.id + '" style="cursor:pointer;">' +
+        '<td><div class="client-name">' + c.nombre + '</div><div class="client-sub">' + c.celular + '</div></td>' +
+        '<td><div class="dots">' + dots + '</div></td>' +
+        '</tr>';
+    });
+    table.innerHTML = html;
+    table.querySelectorAll('.client-row').forEach(row => {
+      row.addEventListener('click', () => {
+        origenDetalle = 'eliminados';
+        cargarDetalleCliente(row.getAttribute('data-id'));
+      });
+    });
+  } catch (err) {
+    table.innerHTML = '<tr><th>Clienta</th><th>Progreso tarjeta</th></tr><tr><td colspan="2" style="text-align:center; color:#a32d2d; padding:20px;">No se pudo conectar con el servidor.</td></tr>';
+  }
+}
+
 // ---------- LISTA DE CLIENTES ----------
 let clientesCache = [];
 
@@ -521,7 +609,10 @@ function renderTabla(lista) {
   });
   table.innerHTML = html;
   document.querySelectorAll('.client-row').forEach(row => {
-    row.addEventListener('click', () => cargarDetalleCliente(row.getAttribute('data-id')));
+    row.addEventListener('click', () => {
+      origenDetalle = 'lista';
+      cargarDetalleCliente(row.getAttribute('data-id'));
+    });
   });
 }
 
@@ -764,6 +855,7 @@ async function cargarDetalleCliente(id) {
   document.getElementById('det-dots').innerHTML = '';
   document.getElementById('det-historial').innerHTML = '';
   document.getElementById('det-banner').style.display = 'none';
+  document.getElementById('det-banner-eliminado').style.display = 'none';
 
   try {
     const resp = await fetch(SCRIPT_URL + '?action=tarjeta&id=' + encodeURIComponent(id));
@@ -786,7 +878,13 @@ async function cargarDetalleCliente(id) {
     document.getElementById('det-dots').innerHTML = dots;
 
     const completo = sellos >= META_SELLOS;
-    document.getElementById('det-banner').style.display = completo ? 'block' : 'none';
+    document.getElementById('det-banner').style.display = (completo && !data.eliminado) ? 'block' : 'none';
+    document.getElementById('det-banner-eliminado').style.display = data.eliminado ? 'block' : 'none';
+
+    // Si la clienta está eliminada: se oculta lo que solo aplica a clientas activas
+    document.getElementById('det-acciones-iconos').style.display = data.eliminado ? 'none' : 'flex';
+    document.getElementById('det-wsp').style.display = data.eliminado ? 'none' : 'flex';
+    document.getElementById('btn-nueva-compra').style.display = data.eliminado ? 'none' : 'block';
 
     const numeroLimpio = String(data.celular || '').replace(/\D/g, '');
     const numeroConCodigo = numeroLimpio.startsWith('593') ? numeroLimpio : '593' + numeroLimpio.replace(/^0/, '');
