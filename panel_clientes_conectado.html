@@ -323,6 +323,8 @@ function abrirNuevoCliente() {
   document.getElementById('f-detalle').value = '';
   document.getElementById('f-valor').value = '';
   document.getElementById('f-foto').value = '';
+  // Clienta nueva: los datos personales se pueden escribir libremente
+  setCamposClienteBloqueados(false);
   document.getElementById('result-box').classList.remove('show');
   document.getElementById('error-box').classList.remove('show');
   mostrarVista('agregar');
@@ -339,9 +341,22 @@ function abrirNuevaCompra() {
   document.getElementById('f-detalle').value = '';
   document.getElementById('f-valor').value = '';
   document.getElementById('f-foto').value = '';
+  // Clienta ya existente: nombre, dirección y celular quedan solo de lectura
+  setCamposClienteBloqueados(true);
   document.getElementById('result-box').classList.remove('show');
   document.getElementById('error-box').classList.remove('show');
   mostrarVista('agregar');
+}
+
+// Bloquea o desbloquea nombre/dirección/celular y los sombrea visualmente
+function setCamposClienteBloqueados(bloquear) {
+  ['f-nombre', 'f-direccion', 'f-celular'].forEach(function (id) {
+    const el = document.getElementById(id);
+    el.readOnly = bloquear;
+    el.style.background = bloquear ? '#f0f0f0' : '';
+    el.style.color = bloquear ? '#888' : '';
+    el.style.cursor = bloquear ? 'not-allowed' : '';
+  });
 }
 
 // ---------- LISTA DE CLIENTES ----------
