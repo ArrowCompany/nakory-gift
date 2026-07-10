@@ -221,8 +221,16 @@
   <!-- VISTA DETALLE CLIENTE -->
   <div class="view" id="view-detalle">
     <div class="card" style="max-width: 460px; margin: 0 auto;">
-      <h2 id="det-nombre" style="margin-bottom:2px;">-</h2>
-      <p class="client-sub" id="det-sub" style="margin:0 0 14px;">-</p>
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
+        <div>
+          <h2 id="det-nombre" style="margin-bottom:2px;">-</h2>
+          <p class="client-sub" id="det-sub" style="margin:0 0 14px;">-</p>
+        </div>
+        <div style="display:flex; gap:6px; flex-shrink:0;">
+          <button class="icon-btn" title="Editar contacto" onclick="abrirEditarContacto()">✏️</button>
+          <button class="icon-btn" title="Eliminar contacto" onclick="eliminarContactoActual()">🗑️</button>
+        </div>
+      </div>
       <div class="dots" id="det-dots" style="margin-bottom:14px;"></div>
       <div id="det-banner" style="display:none; background:#fdeeda; color:#854f0b; border-radius:10px; padding:10px 12px; font-size:12px; font-weight:600; margin-bottom:14px;">
         Completó su tarjeta — 25% off en su próxima compra mayor a $25
@@ -237,7 +245,13 @@
   <!-- VISTA AGREGAR -->
   <div class="view" id="view-agregar">
     <div class="card" style="max-width: 380px; margin: 0 auto;">
-      <h2 id="form-title">+ Agregar clienta / registrar compra</h2>
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
+        <h2 id="form-title" style="margin:0;">+ Agregar clienta / registrar compra</h2>
+        <div id="acciones-contacto" style="display:none; gap:6px; flex-shrink:0;">
+          <button class="icon-btn" title="Editar contacto" onclick="abrirEditarContacto()">✏️</button>
+          <button class="icon-btn" title="Eliminar contacto" onclick="eliminarContactoActual()">🗑️</button>
+        </div>
+      </div>
       <label>Nombre completo</label>
       <input type="text" id="f-nombre" placeholder="Ej. María Pérez">
       <label>Dirección</label>
@@ -267,6 +281,22 @@
 
   <button class="fab-add" id="add-btn" title="Agregar clienta" onclick="abrirNuevoCliente()">+</button>
 
+</div>
+
+<div class="overlay" id="overlay-editar">
+  <div class="modal">
+    <h3>Editar contacto</h3>
+    <p>Actualiza los datos de la clienta</p>
+    <label>Nombre completo</label>
+    <input type="text" id="edit-nombre">
+    <label>Dirección</label>
+    <input type="text" id="edit-direccion">
+    <label>Número de celular</label>
+    <input type="text" id="edit-celular">
+    <div class="error-box" id="edit-error-box" style="margin-top:10px;"></div>
+    <button class="btn-add" id="btn-guardar-edicion" onclick="guardarEdicionContacto()">Guardar cambios</button>
+    <button class="close-btn" onclick="document.getElementById('overlay-editar').classList.remove('show')">Cancelar</button>
+  </div>
 </div>
 
 <div class="overlay" id="overlay">
@@ -325,6 +355,7 @@ function abrirNuevoCliente() {
   document.getElementById('f-foto').value = '';
   // Clienta nueva: los datos personales se pueden escribir libremente
   setCamposClienteBloqueados(false);
+  document.getElementById('acciones-contacto').style.display = 'none';
   document.getElementById('result-box').classList.remove('show');
   document.getElementById('error-box').classList.remove('show');
   mostrarVista('agregar');
@@ -343,6 +374,7 @@ function abrirNuevaCompra() {
   document.getElementById('f-foto').value = '';
   // Clienta ya existente: nombre, dirección y celular quedan solo de lectura
   setCamposClienteBloqueados(true);
+  document.getElementById('acciones-contacto').style.display = 'flex';
   document.getElementById('result-box').classList.remove('show');
   document.getElementById('error-box').classList.remove('show');
   mostrarVista('agregar');
@@ -357,6 +389,96 @@ function setCamposClienteBloqueados(bloquear) {
     el.style.color = bloquear ? '#888' : '';
     el.style.cursor = bloquear ? 'not-allowed' : '';
   });
+}
+
+// ---------- EDITAR / ELIMINAR CONTACTO ----------
+function abrirEditarContacto() {
+  if (!clienteDetalleActual) return;
+  document.getElementById('edit-nombre').value = clienteDetalleActual.nombre || '';
+  document.getElementById('edit-direccion').value = clienteDetalleActual.direccion || '';
+  document.getElementById('edit-celular').value = clienteDetalleActual.celular || '';
+  document.getElementById('edit-error-box').classList.remove('show');
+  document.getElementById('overlay-editar').classList.add('show');
+}
+
+async function guardarEdicionContacto() {
+  if (!clienteDetalleActual) return;
+  const nombre = document.getElementById('edit-nombre').value.trim();
+  const direccion = document.getElementById('edit-direccion').value.trim();
+  const celular = document.getElementById('edit-celular').value.trim();
+  const errorBox = document.getElementById('edit-error-box');
+  errorBox.classList.remove('show');
+
+  if (!nombre || !celular) {
+    errorBox.textContent = 'Completa al menos nombre y celular.';
+    errorBox.classList.add('show');
+    return;
+  }
+
+  const btn = document.getElementById('btn-guardar-edicion');
+  btn.disabled = true;
+  btn.textContent = 'Guardando...';
+
+  try {
+    const resp = await fetch(SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ action: 'editarCliente', id: clienteDetalleActual.id, nombre, direccion, celular })
+    });
+    const data = await resp.json();
+
+    if (!data.success) {
+      errorBox.textContent = 'Error: ' + (data.error || 'No se pudo guardar');
+      errorBox.classList.add('show');
+      return;
+    }
+
+    clienteDetalleActual.nombre = nombre;
+    clienteDetalleActual.direccion = direccion;
+    clienteDetalleActual.celular = celular;
+    document.getElementById('overlay-editar').classList.remove('show');
+
+    const vistaActiva = document.querySelector('.view.active').id;
+    if (vistaActiva === 'view-detalle') {
+      cargarDetalleCliente(clienteDetalleActual.id);
+    } else if (vistaActiva === 'view-agregar') {
+      document.getElementById('form-title').textContent = '+ Nueva compra de ' + nombre;
+      document.getElementById('f-nombre').value = nombre;
+      document.getElementById('f-direccion').value = direccion;
+      document.getElementById('f-celular').value = celular;
+    }
+  } catch (err) {
+    errorBox.textContent = 'No se pudo conectar con el servidor.';
+    errorBox.classList.add('show');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Guardar cambios';
+  }
+}
+
+async function eliminarContactoActual() {
+  if (!clienteDetalleActual) return;
+  const ok = confirm('¿Eliminar a ' + clienteDetalleActual.nombre + '? Ya no aparecerá en la lista de clientas.');
+  if (!ok) return;
+
+  try {
+    const resp = await fetch(SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ action: 'eliminarCliente', id: clienteDetalleActual.id })
+    });
+    const data = await resp.json();
+
+    if (!data.success) {
+      alert('Error: ' + (data.error || 'No se pudo eliminar'));
+      return;
+    }
+
+    clienteDetalleActual = null;
+    mostrarVista('lista');
+  } catch (err) {
+    alert('No se pudo conectar con el servidor.');
+  }
 }
 
 // ---------- LISTA DE CLIENTES ----------
